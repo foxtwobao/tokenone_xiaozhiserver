@@ -220,6 +220,10 @@ public class ConfigServiceImpl implements ConfigService {
         // 获取声纹信息
         buildVoiceprintConfig(agent.getId(), result);
 
+        boolean omniMode = "omni".equals(agent.getModelMode());
+        if (omniMode) {
+            xiaozhi.modules.agent.util.OmniModelValidation.validate(agent.getModelMode(), agent.getOmniModelId(), modelConfigService);
+        }
         // 构建模块配置
         buildModuleConfig(
                 agent.getAgentName(),
@@ -233,9 +237,9 @@ public class ConfigServiceImpl implements ConfigService {
                 agent.getTtsRate(),
                 agent.getTtsPitch(),
                 agent.getVadModelId(),
-                agent.getAsrModelId(),
-                agent.getLlmModelId(),
-                agent.getVllmModelId(),
+                omniMode ? null : agent.getAsrModelId(),
+                omniMode ? agent.getOmniModelId() : agent.getLlmModelId(),
+                omniMode ? null : agent.getVllmModelId(),
                 agent.getSlmModelId(),
                 agent.getTtsModelId(),
                 agent.getMemModelId(),
@@ -243,6 +247,17 @@ public class ConfigServiceImpl implements ConfigService {
                 null,
                 result,
                 true);
+
+        if (omniMode) {
+            // Keep separately configured intent/memory/SLM providers in LLM.
+            Map<String, Object> llms = (Map<String, Object>) result.get("LLM");
+            Object omni = llms.remove(agent.getOmniModelId());
+            result.put("OMNI", Map.of(agent.getOmniModelId(), omni));
+            result.put("model_mode", "omni");
+            Map<String, String> modules = (Map<String, String>) result.get("selected_module");
+            modules.remove("LLM");
+            modules.put("OMNI", agent.getOmniModelId());
+        }
 
         return result;
     }

@@ -381,6 +381,8 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
         }
 
         // 只更新提供的非空字段
+        if (dto.getModelMode() != null) existingEntity.setModelMode(dto.getModelMode());
+        if (dto.getOmniModelId() != null) existingEntity.setOmniModelId(dto.getOmniModelId());
         if (dto.getAgentName() != null) {
             existingEntity.setAgentName(dto.getAgentName());
         }
@@ -533,7 +535,9 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
             agentTagService.saveAgentTags(agentId, dto.getTagIds(), dto.getTagNames());
         }
 
-        boolean b = validateLLMIntentParams(existingEntity.getLlmModelId(), existingEntity.getIntentModelId());
+        xiaozhi.modules.agent.util.OmniModelValidation.validate(existingEntity.getModelMode(), existingEntity.getOmniModelId(), modelConfigService);
+        boolean b = "omni".equals(existingEntity.getModelMode())
+                || validateLLMIntentParams(existingEntity.getLlmModelId(), existingEntity.getIntentModelId());
         if (!b) {
             throw new RenException(ErrorCode.LLM_INTENT_PARAMS_MISMATCH);
         }
@@ -579,11 +583,11 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
         }
         ModelConfigEntity llmModelData = modelConfigService.selectById(llmModelId);
         String type = llmModelData.getConfigJson().get("type").toString();
-        // 如果查询大语言模型是openai或者ollama，意图识别选参数都可以
+        // 支持工具调用的供应器允许选择函数调用意图识别
         if ("openai".equals(type) || "ollama".equals(type)) {
             return true;
         }
-        // 除了openai和ollama的类型，不可以选择id为Intent_function_call（函数调用）的意图识别
+        // 其他供应器不允许选择 Intent_function_call
         return !"Intent_function_call".equals(intentModelId);
     }
 

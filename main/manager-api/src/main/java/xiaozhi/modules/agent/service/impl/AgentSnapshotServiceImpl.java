@@ -331,6 +331,8 @@ public class AgentSnapshotServiceImpl extends BaseServiceImpl<AgentSnapshotDao, 
         data.setAgentCode(agent.getAgentCode());
         data.setAgentName(agent.getAgentName());
         data.setAsrModelId(agent.getAsrModelId());
+        data.setModelMode(agent.getModelMode());
+        data.setOmniModelId(agent.getOmniModelId());
         data.setVadModelId(agent.getVadModelId());
         data.setLlmModelId(agent.getLlmModelId());
         data.setSlmModelId(agent.getSlmModelId());
@@ -571,6 +573,10 @@ public class AgentSnapshotServiceImpl extends BaseServiceImpl<AgentSnapshotDao, 
     }
 
     private void validateRestoreParams(AgentEntity agent) {
+        if (agent != null) {
+            xiaozhi.modules.agent.util.OmniModelValidation.validate(agent.getModelMode(), agent.getOmniModelId(), modelConfigService);
+            if ("omni".equals(agent.getModelMode())) return;
+        }
         if (agent == null || StringUtils.isBlank(agent.getLlmModelId())) {
             return;
         }

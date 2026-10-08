@@ -69,6 +69,59 @@ class ConfigServiceImplTest {
         assertEquals(List.of("first", "second"), features.get("labels"));
     }
 
+
+    @Test
+    void modeSelectsOnlyTheActiveInputPipelineAndPreservesSavedSelections() {
+        var models = mock(ModelConfigService.class);
+        var agents = mock(AgentService.class);
+        var devices = mock(DeviceService.class);
+        var agent = new xiaozhi.modules.agent.vo.AgentInfoVO();
+        agent.setId("a");
+        agent.setAgentName("test");
+        agent.setAsrModelId("asr");
+        agent.setLlmModelId("llm");
+        agent.setVllmModelId("vision");
+        agent.setIntentModelId("Intent_nointent");
+        agent.setOmniModelId("omni");
+        agent.setSystemPrompt("Original prompt");
+        var device = new xiaozhi.modules.device.entity.DeviceEntity();
+        device.setAgentId("a");
+        when(devices.getDeviceByMacAddress("mac")).thenReturn(device);
+        when(agents.getAgentById("a")).thenReturn(agent);
+        for (String id : List.of("asr", "llm", "vision", "Intent_nointent", "omni")) {
+            var model = new xiaozhi.modules.model.entity.ModelConfigEntity();
+            model.setId(id);
+            model.setIsEnabled(1);
+            model.setModelType("omni".equals(id) ? "OMNI" : "LLM");
+            model.setConfigJson(new cn.hutool.json.JSONObject().set("type", "omni".equals(id) ? "qwen_omni" : "openai"));
+            when(models.selectById(id)).thenReturn(model);
+            when(models.getModelByIdFromCache(id)).thenReturn(model);
+        }
+        var service = newService(mock(SysParamsService.class), mock(RedisUtils.class));
+        ReflectionTestUtils.setField(service, "modelConfigService", models);
+        ReflectionTestUtils.setField(service, "agentService", agents);
+        ReflectionTestUtils.setField(service, "deviceService", devices);
+        var original = service.getAgentModels("mac", Map.of());
+        agent.setModelMode("separate");
+        assertEquals(original, service.getAgentModels("mac", Map.of()));
+        org.junit.jupiter.api.Assertions.assertFalse(original.containsKey("OMNI"));
+        org.junit.jupiter.api.Assertions.assertFalse(original.containsKey("model_mode"));
+        agent.setModelMode("omni");
+        var unified = service.getAgentModels("mac", Map.of());
+        assertEquals("omni", unified.get("model_mode"));
+        var selected = (Map<?, ?>) unified.get("selected_module");
+        assertEquals("omni", selected.get("OMNI"));
+        for (String type : List.of("ASR", "LLM", "VLLM")) {
+            org.junit.jupiter.api.Assertions.assertFalse(selected.containsKey(type));
+        }
+        assertEquals("Original prompt", unified.get("prompt"));
+        assertEquals("asr", agent.getAsrModelId());
+        assertEquals("llm", agent.getLlmModelId());
+        assertEquals("vision", agent.getVllmModelId());
+        agent.setModelMode("separate");
+        assertEquals(original, service.getAgentModels("mac", Map.of()));
+    }
+
     private static SysParamsDTO parameter(String code, String value, String type) {
         SysParamsDTO parameter = new SysParamsDTO();
         parameter.setParamCode(code);

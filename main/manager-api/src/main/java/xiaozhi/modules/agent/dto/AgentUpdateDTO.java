@@ -30,6 +30,12 @@ public class AgentUpdateDTO implements Serializable {
     @Schema(description = "语音识别模型标识", example = "asr_model_02", nullable = true)
     private String asrModelId;
 
+    @Schema(description = "输入模型模式：separate 或 omni")
+    private String modelMode;
+
+    @Schema(description = "独立 Omni 模型标识")
+    private String omniModelId;
+
     @Schema(description = "语音活动检测标识", example = "vad_model_02", nullable = true)
     private String vadModelId;
 

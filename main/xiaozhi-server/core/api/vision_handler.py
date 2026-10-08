@@ -110,24 +110,28 @@ class VisionHandler(BaseHandler):
                     client_id,
                 )
 
-            select_vllm_module = current_config["selected_module"].get("VLLM")
-            if not select_vllm_module:
-                raise ValueError("您还未设置默认的视觉分析模块")
+            if current_config.get("model_mode") == "omni":
+                from core.multimodal.vision import describe_image
+                result = await describe_image(current_config, image_data, question)
+            else:
+                select_vllm_module = current_config["selected_module"].get("VLLM")
+                if not select_vllm_module:
+                    raise ValueError("您还未设置默认的视觉分析模块")
 
-            vllm_type = (
-                select_vllm_module
-                if "type" not in current_config["VLLM"][select_vllm_module]
-                else current_config["VLLM"][select_vllm_module]["type"]
-            )
+                vllm_type = (
+                    select_vllm_module
+                    if "type" not in current_config["VLLM"][select_vllm_module]
+                    else current_config["VLLM"][select_vllm_module]["type"]
+                )
 
-            if not vllm_type:
-                raise ValueError(f"无法找到VLLM模块对应的供应器{vllm_type}")
+                if not vllm_type:
+                    raise ValueError(f"无法找到VLLM模块对应的供应器{vllm_type}")
 
-            vllm = create_instance(
-                vllm_type, current_config["VLLM"][select_vllm_module]
-            )
+                vllm = create_instance(
+                    vllm_type, current_config["VLLM"][select_vllm_module]
+                )
 
-            result = vllm.response(question, image_base64)
+                result = vllm.response(question, image_base64)
 
             return_json = {
                 "success": True,

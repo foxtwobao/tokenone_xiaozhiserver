@@ -551,6 +551,7 @@ const FALLBACK_FIELD_LABEL_KEYS = {
 };
 
 const MODEL_FIELD_TYPES = {
+  omniModelId: "OMNI",
   asrModelId: "ASR",
   vadModelId: "VAD",
   llmModelId: "LLM",
@@ -561,7 +562,7 @@ const MODEL_FIELD_TYPES = {
   intentModelId: "Intent"
 };
 
-const MODEL_TYPES = ["ASR", "VAD", "LLM", "SLM", "VLLM", "TTS", "Memory", "Intent"];
+const MODEL_TYPES = ["OMNI", "ASR", "VAD", "LLM", "SLM", "VLLM", "TTS", "Memory", "Intent"];
 
 const FALLBACK_MODEL_NAME_KEYS = {
   Memory_nomem: "agentSnapshot.model.Memory_nomem",

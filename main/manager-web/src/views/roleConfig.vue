@@ -189,6 +189,20 @@
                     </el-form-item>
                   </div>
                   <div class="form-column">
+                    <el-form-item :label="$t('roleConfig.modelMode')">
+                      <el-radio-group v-model="form.modelMode" @change="updateIntentOptionsVisibility">
+                        <el-radio-button label="separate">{{ $t('roleConfig.separateMode') }}</el-radio-button>
+                        <el-radio-button label="omni">{{ $t('roleConfig.omniMode') }}</el-radio-button>
+                      </el-radio-group>
+                    </el-form-item>
+                    <el-form-item v-if="form.modelMode === 'omni'" :label="$t('modelConfig.omni')">
+                      <el-select v-model="form.omniModelId" filterable class="form-select"
+                        :placeholder="$t('roleConfig.pleaseSelect')">
+                        <el-option v-for="item in modelOptions.OMNI" :key="item.value"
+                          :label="item.label" :value="item.value" />
+                      </el-select>
+                      <div class="omni-mode-description">{{ $t('roleConfig.omniDescription') }}</div>
+                    </el-form-item>
                     <div class="model-row">
                       <el-form-item 
                         v-if="featureStatus.vad" 
@@ -217,7 +231,7 @@
                         </div>
                       </el-form-item>
                       <el-form-item 
-                        v-if="featureStatus.asr" 
+                        v-if="featureStatus.asr && form.modelMode !== 'omni'"
                         class="model-item"
                       >
                         <template #label>
@@ -244,7 +258,7 @@
                       </el-form-item>
                     </div>
                     <div class="model-row">
-                      <el-form-item class="model-item">
+                      <el-form-item v-if="form.modelMode !== 'omni'" class="model-item">
                         <template #label>
                           <el-tooltip :content="$t('roleConfig.tooltip.llm')" placement="top" effect="light" popper-class="custom-tooltip">
                             <span>{{ $t('roleConfig.llm') }}</span>
@@ -281,17 +295,18 @@
                             class="form-select"
                           >
                             <el-option
-                              v-for="(item, optionIndex) in modelOptions['LLM']"
+                              v-for="(item, optionIndex) in slmModelOptions"
                               :key="`option-asr-${optionIndex}`"
                               :label="item.label"
                               :value="item.value"
+                              :disabled="item.disabled"
                             />
                           </el-select>
                         </div>
                       </el-form-item>
                     </div>
                     <el-form-item
-                      v-for="(model, index) in models.slice(4)"
+                      v-for="(model, index) in models.slice(4).filter(item => form.modelMode !== 'omni' || item.type !== 'VLLM')"
                       :key="`model-${index}`"
                       class="model-item"
                     >
@@ -525,6 +540,8 @@ export default {
         langCode: "",
         language: "",
         sort: "",
+        modelMode: "separate",
+        omniModelId: "",
         model: {
           ttsModelId: "",
           vadModelId: "",
@@ -594,6 +611,15 @@ export default {
     };
   },
   computed: {
+    slmModelOptions() {
+      const options = this.modelOptions.LLM || [];
+      const selected = this.form.model.slmModelId;
+      const migrated = (this.modelOptions.OMNI || []).find(item => item.value === selected);
+      // Keep an existing auxiliary selection readable after its model changes category.
+      return migrated && !options.some(item => item.value === selected)
+        ? [...options, { ...migrated, disabled: true }]
+        : options;
+    },
     configInteractionBlocked() {
       return this.agentReloading
         || this.voiceOptionsLoading
@@ -629,7 +655,13 @@ export default {
       if (this.configInteractionBlocked) {
         return;
       }
+      if (this.form.modelMode === "omni" && !this.form.omniModelId) {
+        this.$message.error(this.$t("roleConfig.selectOmni"));
+        return;
+      }
       const configData = {
+        modelMode: this.form.modelMode,
+        omniModelId: this.form.omniModelId,
         agentCode: this.form.agentCode,
         agentName: this.form.agentName,
         asrModelId: this.form.model.asrModelId,
@@ -803,6 +835,8 @@ export default {
           this.ttsLanguageTouched = true;
           this.ttsVoiceTouched = true;
           this.form = {
+            modelMode: "separate",
+            omniModelId: "",
             agentCode: "",
             agentName: "",
             ttsVoiceId: "",
@@ -984,6 +1018,8 @@ export default {
             this.form = {
               ...this.form,
               ...agentData,
+              modelMode: agentData.modelMode || "separate",
+              omniModelId: agentData.omniModelId || "",
               model: {
                 ttsModelId: agentData.ttsModelId,
                 vadModelId: agentData.vadModelId,
@@ -1034,6 +1070,9 @@ export default {
       });
     },
     fetchModelOptions() {
+      Api.model.getModelNames("OMNI", "", ({ data }) => {
+        if (data.code === 0) this.$set(this.modelOptions, "OMNI", data.data.map(item => ({ value: item.id, label: item.modelName })));
+      });
       this.models.forEach((model) => {
         if (model.type != "LLM") {
           Api.model.getModelNames(model.type, "", ({ data }) => {
@@ -1069,6 +1108,7 @@ export default {
                 this.llmModeTypeMap.set(item.id, item.type);
               });
               this.$set(this.modelOptions, model.type, LLMdata);
+              this.updateIntentOptionsVisibility();
             } else {
               this.$message.error(data.msg || i18n.t("roleConfig.fetchModelsFailed"));
             }
@@ -1499,17 +1539,22 @@ export default {
     },
     updateIntentOptionsVisibility() {
       // 根据当前选择的LLM类型更新意图识别选项的可见性
+      if (this.form.modelMode === "omni") {
+        (this.modelOptions.Intent || []).forEach(item => { item.isHidden = false; });
+        return;
+      }
       const currentLlmId = this.form.model.llmModelId;
       if (!currentLlmId || !this.modelOptions["Intent"]) return;
 
       const llmType = this.llmModeTypeMap.get(currentLlmId);
       if (!llmType) return;
 
+      const supportsFunctionCall = ["openai", "ollama"].includes(llmType);
+
       this.modelOptions["Intent"].forEach((item) => {
         if (item.value === "Intent_function_call") {
-          // 如果llmType是openai或ollama，允许选择function_call
-          // 否则隐藏function_call选项
-          if (llmType === "openai" || llmType === "ollama") {
+          // 支持工具调用的供应器允许选择 function_call。
+          if (supportsFunctionCall) {
             item.isHidden = false;
           } else {
             item.isHidden = true;
@@ -1523,8 +1568,7 @@ export default {
       // 如果当前选择的意图识别是function_call，但LLM类型不支持，则设置为可选的第一项
       if (
         this.form.model.intentModelId === "Intent_function_call" &&
-        llmType !== "openai" &&
-        llmType !== "ollama"
+        !supportsFunctionCall
       ) {
         // 找到第一个可见的选项
         const firstVisibleOption = this.modelOptions["Intent"].find(

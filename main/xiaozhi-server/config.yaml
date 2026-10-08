@@ -1173,3 +1173,16 @@ TTS:
     # speed: 50  # 语速：0-100
     # pitch: 50  # 语调：0-100
     # language: "中文"  # 指定输出语种,如:中文、英语、日语、韩语等,请根据所选音色支持的语言进行设置,不填则默认为中文
+
+# 独立多模态配置。仅 model_mode: omni 时生效；selected_module.OMNI 选择模型。
+model_mode: separate
+OMNI:
+  QwenOmni:
+    type: qwen_omni
+    model_name: qwen3.8-omni-flash
+    # 填写百炼工作空间对应的地址；也可设置 DASHSCOPE_BASE_URL / DASHSCOPE_API_KEY
+    base_url: ""
+    api_key: ""
+    reasoning_effort: none
+    max_tokens: 2048
+    max_audio_seconds: 60

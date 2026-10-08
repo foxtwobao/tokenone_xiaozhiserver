@@ -40,6 +40,9 @@
           <el-menu-item index="llm">
             <span class="menu-text">{{ $t("modelConfig.llm") }}</span>
           </el-menu-item>
+          <el-menu-item index="omni">
+            <span class="menu-text">{{ $t("modelConfig.omni") }}</span>
+          </el-menu-item>
           <el-menu-item index="vllm">
             <span class="menu-text">{{ $t("modelConfig.vllm") }}</span>
           </el-menu-item>

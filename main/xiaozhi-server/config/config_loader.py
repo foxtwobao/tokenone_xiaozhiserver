@@ -44,6 +44,9 @@ async def load_config():
     else:
         # 合并配置
         config = merge_configs(default_config, custom_config)
+    if config.get("model_mode") == "omni":
+        from core.multimodal.routing import prepare_config
+        config = prepare_config(config)
     # 初始化目录
     ensure_directories(config)
 
@@ -103,6 +106,9 @@ async def get_private_config_from_api(config, device_id, client_id):
     private_config = agent_result if not isinstance(agent_result, Exception) else {}
     if correct_words:
         private_config["correct_words"] = correct_words
+    if private_config.get("model_mode") == "omni":
+        from core.multimodal.routing import prepare_config
+        private_config = prepare_config(private_config)
     return private_config
 
 

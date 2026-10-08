@@ -12,6 +12,8 @@
         <result column="agentCode" property="agentCode"/>
         <result column="agentName" property="agentName"/>
         <result column="asrModelId" property="asrModelId"/>
+        <result column="modelMode" property="modelMode"/>
+        <result column="omniModelId" property="omniModelId"/>
         <result column="vadModelId" property="vadModelId"/>
         <result column="llmModelId" property="llmModelId"/>
         <result column="slmModelId" property="slmModelId"/>
@@ -50,6 +52,8 @@
                a.agent_code        AS agentCode,
                a.agent_name        AS agentName,
                a.asr_model_id      AS asrModelId,
+               a.model_mode        AS modelMode,
+               a.omni_model_id     AS omniModelId,
                a.vad_model_id      AS vadModelId,
                a.llm_model_id      AS llmModelId,
                a.slm_model_id      AS slmModelId,
@@ -93,6 +97,8 @@
         UPDATE ai_agent
         SET agent_code = #{agent.agentCode,jdbcType=VARCHAR},
             agent_name = #{agent.agentName,jdbcType=VARCHAR},
+            model_mode = #{agent.modelMode,jdbcType=VARCHAR},
+            omni_model_id = #{agent.omniModelId,jdbcType=VARCHAR},
             asr_model_id = #{agent.asrModelId,jdbcType=VARCHAR},
             vad_model_id = #{agent.vadModelId,jdbcType=VARCHAR},
             llm_model_id = #{agent.llmModelId,jdbcType=VARCHAR},

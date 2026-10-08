@@ -9,6 +9,8 @@ from core.handle.textMessageHandler import TextMessageHandler
 from core.handle.textHandler.serverMessageHandler import ServerTextMessageHandler
 from core.handle.textHandler.pingMessageHandler import PingMessageHandler
 
+from core.handle.textHandler.mediaMessageHandler import MediaMessageHandler
+
 TAG = __name__
 
 
@@ -23,6 +25,7 @@ class TextMessageHandlerRegistry:
         """注册默认的消息处理器"""
         handlers = [
             HelloTextMessageHandler(),
+            MediaMessageHandler(),
             AbortTextMessageHandler(),
             ListenTextMessageHandler(),
             IotTextMessageHandler(),

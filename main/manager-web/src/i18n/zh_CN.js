@@ -1,4 +1,14 @@
 export default {
+  'agentSnapshot.field.modelMode': '输入模型模式',
+  'agentSnapshot.field.omniModelId': 'Omni 多模态模型',
+
+  'modelConfig.omni': 'Omni 多模态模型',
+  'roleConfig.modelMode': '输入模型模式',
+  'roleConfig.separateMode': '分开接入',
+  'roleConfig.omniMode': 'Omni 多模态',
+  'roleConfig.omniDescription': '文本、音频、图片和视频统一使用此模型；ASR、LLM、VLLM 配置保留但不生效，语音输出使用所选 TTS。',
+  'roleConfig.selectOmni': '请选择 Omni 多模态模型',
+
   // 登录页面相关提示文本
   'login.requiredUsername': '用户名不能为空',
   'login.requiredPassword': '密码不能为空',

@@ -1,0 +1,82 @@
+name: tokenone-xiaozhi
+services:
+  server:
+    image: ghcr.io/xinnan-tech/xiaozhi-esp32-server:server-base
+    working_dir: /opt/xiaozhi-esp32-server
+    command: ["python", "app.py"]
+    restart: unless-stopped
+    stdin_open: true
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${XIAOZHI_BIND_IP:-127.0.0.1}:8000:8000"
+      - "${XIAOZHI_BIND_IP:-127.0.0.1}:8003:8003"
+    volumes:
+      - ./main/xiaozhi-server:/opt/xiaozhi-esp32-server
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+  web:
+    image: tokenone-xiaozhi-web:local
+    build:
+      context: .
+      dockerfile: Dockerfile-web
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_DATASOURCE_DRUID_URL: jdbc:mysql://db:3306/xiaozhi_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000
+      SPRING_DATASOURCE_DRUID_USERNAME: root
+      SPRING_DATASOURCE_DRUID_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.local}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      LOGGING_LEVEL_XIAOZHI: INFO
+    ports:
+      - "${XIAOZHI_BIND_IP:-127.0.0.1}:8002:8002"
+    volumes:
+      - uploads:/uploadfile
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8002/xiaozhi/user/pub-config"]
+      interval: 15s
+      timeout: 10s
+      start_period: 120s
+      retries: 10
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.local}
+      MYSQL_DATABASE: xiaozhi_esp32_server
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  mysql:
+  redis:
+  uploads:

@@ -605,6 +605,9 @@ class ConnectionHandler:
 
     def _initialize_components(self):
         try:
+            if self.config.get("model_mode") == "omni":
+                # Preserve the original transport limit for every other connection.
+                self.websocket.protocol.max_size = 12 * 1024 * 1024
             if self.tts is None:
                 self.tts = self._initialize_tts()
             # 打开语音合成通道
@@ -836,6 +839,11 @@ class ConnectionHandler:
             False,
         )
 
+        if private_config.get("model_mode") == "omni":
+            self.config["model_mode"] = "omni"
+            self.config["OMNI"] = private_config["OMNI"]
+            self.config["selected_module"]["OMNI"] = private_config["selected_module"]["OMNI"]
+
         init_vad = check_vad_update(self.common_config, private_config)
         init_asr = check_asr_update(self.common_config, private_config)
 
@@ -942,6 +950,10 @@ class ConnectionHandler:
             )
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"初始化组件失败: {e}")
+            if self.config.get("model_mode") == "omni":
+                self.llm = None
+                self.asr = None
+                raise
             modules = {}
         if modules.get("tts", None) is not None:
             self.tts = modules["tts"]
@@ -1052,7 +1064,7 @@ class ConnectionHandler:
         # 更新系统prompt至上下文
         self.dialogue.update_system_message(self.prompt)
 
-    def chat(self, query, depth=0):
+    def chat(self, query, depth=0, media_content=None):
         # 保存当前任务的sentence_id到局部变量，避免被新任务覆盖
         current_sentence_id = None
 
@@ -1063,7 +1075,7 @@ class ConnectionHandler:
         if depth == 0:
             current_sentence_id = str(uuid.uuid4().hex)
             self.sentence_id = current_sentence_id  # 更新共享属性
-            self.dialogue.put(Message(role="user", content=query))
+            self.dialogue.put(Message(role="user", content=query, model_content=media_content))
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
                     sentence_id=current_sentence_id,
@@ -1388,7 +1400,9 @@ class ConnectionHandler:
             # 使用lambda延迟计算，只有在DEBUG级别时才执行get_llm_dialogue()
             self.logger.bind(tag=TAG).debug(
                 lambda: json.dumps(
-                    self.dialogue.get_llm_dialogue(), indent=4, ensure_ascii=False
+                    ([{"role": m.role, "content": m.content} for m in self.dialogue.dialogue]
+                     if self.config.get("model_mode") == "omni" else self.dialogue.get_llm_dialogue()),
+                    indent=4, ensure_ascii=False
                 )
             )
 

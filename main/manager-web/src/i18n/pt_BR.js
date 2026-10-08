@@ -1,4 +1,14 @@
 export default {
+  'agentSnapshot.field.modelMode': 'Input model mode',
+  'agentSnapshot.field.omniModelId': 'Omni multimodal model',
+
+  'modelConfig.omni': 'Omni multimodal models',
+  'roleConfig.modelMode': 'Input model mode',
+  'roleConfig.separateMode': 'Separate models',
+  'roleConfig.omniMode': 'Omni multimodal',
+  'roleConfig.omniDescription': 'This model handles text, audio, images and video. ASR, LLM and VLLM selections are retained but inactive. Speech output uses your TTS.',
+  'roleConfig.selectOmni': 'Select an Omni model',
+
   // Texto da página de login
   'login.requiredUsername': 'O nome de usuário não pode estar vazio',
   'login.requiredPassword': 'A senha não pode estar vazia',

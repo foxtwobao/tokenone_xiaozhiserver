@@ -14,6 +14,12 @@ public class AgentSnapshotDataDTO implements Serializable {
     private String agentCode;
     private String agentName;
     private String asrModelId;
+
+    @Schema(description = "输入模型模式：separate 或 omni")
+    private String modelMode;
+
+    @Schema(description = "独立 Omni 模型标识")
+    private String omniModelId;
     private String vadModelId;
     private String llmModelId;
     private String slmModelId;

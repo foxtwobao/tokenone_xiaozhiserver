@@ -31,6 +31,12 @@ public class AgentEntity {
     @Schema(description = "语音识别模型标识")
     private String asrModelId;
 
+    @Schema(description = "输入模型模式：separate 或 omni")
+    private String modelMode;
+
+    @Schema(description = "独立 Omni 模型标识")
+    private String omniModelId;
+
     @Schema(description = "语音活动检测标识")
     private String vadModelId;
 

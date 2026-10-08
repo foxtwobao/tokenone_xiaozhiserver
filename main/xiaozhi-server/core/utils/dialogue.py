@@ -13,10 +13,12 @@ class Message:
             tool_calls=None,
             tool_call_id=None,
             is_temporary=False,
+            model_content=None,
     ):
         self.uniq_id = uniq_id if uniq_id is not None else str(uuid.uuid4())
         self.role = role
         self.content = content
+        self.model_content = model_content
         self.tool_calls = tool_calls
         self.tool_call_id = tool_call_id
         self.is_temporary = is_temporary  # 标记临时消息（如工具调用提醒）
@@ -30,6 +32,10 @@ class Dialogue:
 
     def put(self, message: Message):
         self.dialogue.append(message)
+        # Keep at most four media turns; older turns retain their text description.
+        media_messages = [m for m in self.dialogue if m.model_content is not None]
+        for old in media_messages[:-4]:
+            old.model_content = None
 
     def getMessages(self, m, dialogue):
         if m.tool_calls is not None:
@@ -45,7 +51,7 @@ class Dialogue:
                 }
             )
         else:
-            dialogue.append({"role": m.role, "content": m.content})
+            dialogue.append({"role": m.role, "content": m.model_content if m.model_content is not None else m.content})
 
     def get_llm_dialogue(self) -> List[Dict[str, str]]:
         # 直接调用get_llm_dialogue_with_memory，传入None作为memory_str

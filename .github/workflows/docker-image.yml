@@ -2,87 +2,99 @@ name: Docker Image CI
 
 on:
   push:
-    tags:
-      - 'v*.*.*'  # 只在以 v 开头的标签推送时触发，例如 v1.0.0
+    branches: [main]
+    tags: ['v*.*.*']
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Build Base Image"]
-    types:
-      - completed
+    inputs:
+      platforms:
+        description: Target platforms
+        type: choice
+        default: linux/amd64
+        options:
+          - linux/amd64
+          - linux/arm64
+          - linux/amd64,linux/arm64
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-images-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  base:
+    name: Build server base
+    uses: ./.github/workflows/build-base-image.yml
+    with:
+      platforms: ${{ inputs.platforms || 'linux/amd64' }}
+    secrets: inherit
+
   release:
-    name: Release Docker images
+    name: Build ${{ matrix.component }}
+    needs: base
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: write
-      id-token: write
-      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [server, web]
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      REPOSITORY_NAME: ${{ github.event.repository.name }}
     steps:
-      - name: Check Disk Space
-        run: |
-          df -h
-          docker system df
-
-      - name: Clean up Docker resources
-        run: |
-          docker system prune -af
-          docker builder prune -af
-
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set image name
+        run: echo "IMAGE=${DOCKERHUB_USERNAME,,}/${REPOSITORY_NAME,,}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            network=host
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: get_version
+      - name: Generate image tags
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ matrix.component }}_latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}},prefix=${{ matrix.component }}_
+            type=sha,format=long,prefix=${{ matrix.component }}_sha-
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile-${{ matrix.component }}
+          push: true
+          platforms: ${{ inputs.platforms || 'linux/amd64' }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+          build-args: |
+            SERVER_BASE_IMAGE=${{ env.IMAGE }}@${{ needs.base.outputs.digest }}
+
+      - name: Write build summary
+        env:
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          if [[ "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "VERSION=${BASH_REMATCH[1]}" >> $GITHUB_ENV
-            echo "IS_VERSION=true" >> $GITHUB_ENV
-          else
-            echo "VERSION=latest" >> $GITHUB_ENV
-            echo "IS_VERSION=false" >> $GITHUB_ENV
-          fi
-
-      # 构建 xiaozhi-server 镜像
-      - name: Build and push xiaozhi-server
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile-server
-          push: true
-          tags: |
-            ${{ env.IS_VERSION == 'true' && format('ghcr.io/{0}:server_{1},ghcr.io/{0}:server_latest', github.repository, env.VERSION) || format('ghcr.io/{0}:server_latest', github.repository) }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_PROGRESS=plain
-
-      # 构建 manager-api 镜像
-      - name: Build and push manager-web
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile-web
-          push: true
-          tags: |
-            ${{ env.IS_VERSION == 'true' && format('ghcr.io/{0}:web_{1},ghcr.io/{0}:web_latest', github.repository, env.VERSION) || format('ghcr.io/{0}:web_latest', github.repository) }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_PROGRESS=plain
+          {
+            echo '### ${{ matrix.component }} image'
+            echo '```text'
+            echo "$IMAGE_TAGS"
+            echo "$IMAGE_DIGEST"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
